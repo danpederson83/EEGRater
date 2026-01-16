@@ -207,8 +207,13 @@ class EDFParser:
 
         # Check if cached version exists
         if cache_path.exists() and not force_reprocess:
-            with open(cache_path, 'r') as f:
-                return json.load(f)
+            try:
+                with open(cache_path, 'r') as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                # Cache file is corrupted, delete and reprocess
+                print(f"Corrupted cache file detected: {cache_path}, regenerating...")
+                cache_path.unlink()
 
         # Extract snippets
         snippets = self._extract_snippets_from_edf(edf_path)
