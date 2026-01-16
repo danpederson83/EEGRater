@@ -11,9 +11,12 @@ from sqlalchemy.orm import sessionmaker
 # Get database URL from environment variable
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# Handle Render's postgres:// vs postgresql:// URL format
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+# Handle Render's postgres:// URL format and use psycopg3 driver
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+    elif DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 
 # Create engine - use SQLite fallback for local development
 if DATABASE_URL:
