@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from edf_parser import EDFParser
+from backend.edf_parser import EDFParser
 
 # Configuration
 BASE_DIR = Path(__file__).parent.parent
