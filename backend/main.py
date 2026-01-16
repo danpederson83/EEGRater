@@ -33,6 +33,14 @@ edf_parser = EDFParser(str(EDF_DIR), str(CACHE_DIR))
 # FastAPI app
 app = FastAPI(title="EEG Rater API", version="1.0.0")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # For the demo, "*" allows any site. You can restrict this later.
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # CORS middleware for React frontend
 app.add_middleware(
     CORSMiddleware,
