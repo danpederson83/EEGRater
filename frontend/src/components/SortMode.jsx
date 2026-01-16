@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
+import api from '../api'
 import EEGViewer from './EEGViewer'
 
 // Merge sort implementation that yields pairs for comparison
@@ -109,7 +109,7 @@ function SortMode({ rater }) {
     async function loadSnippets() {
       try {
         setLoading(true)
-        const res = await axios.get('/api/snippets')
+        const res = await api.get('/api/snippets')
         const snippetList = res.data.snippets || []
         setAllSnippets(snippetList)
 
@@ -126,7 +126,7 @@ function SortMode({ rater }) {
 
         // Load full data for selected snippets
         const fullSnippets = await Promise.all(
-          selected.map(s => axios.get(`/api/snippets/${s.id}`).then(r => r.data))
+          selected.map(s => api.get(`/api/snippets/${s.id}`).then(r => r.data))
         )
 
         setSelectedSnippets(fullSnippets)
@@ -197,7 +197,7 @@ function SortMode({ rater }) {
 
     // Save comparison to backend
     try {
-      await axios.post('/api/comparisons', {
+      await api.post('/api/comparisons', {
         snippet_a: snippetA.id,
         snippet_b: snippetB.id,
         winner: winnerValue,
@@ -227,7 +227,7 @@ function SortMode({ rater }) {
 
     // Load full data for new selection
     Promise.all(
-      selected.map(s => axios.get(`/api/snippets/${s.id}`).then(r => r.data))
+      selected.map(s => api.get(`/api/snippets/${s.id}`).then(r => r.data))
     ).then(fullSnippets => {
       setSelectedSnippets(fullSnippets)
     })

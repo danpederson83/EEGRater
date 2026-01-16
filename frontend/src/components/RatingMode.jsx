@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '../api'
 import EEGViewer from './EEGViewer'
 
 function RatingMode({ rater }) {
@@ -19,12 +19,12 @@ function RatingMode({ rater }) {
         setLoading(true)
 
         // Get list of snippets
-        const snippetsRes = await axios.get('/api/snippets')
+        const snippetsRes = await api.get('/api/snippets')
         const snippetList = snippetsRes.data.snippets || []
         setSnippets(snippetList)
 
         // Get progress for this rater
-        const progressRes = await axios.get(`/api/progress/${encodeURIComponent(rater)}`)
+        const progressRes = await api.get(`/api/progress/${encodeURIComponent(rater)}`)
         const ratedIds = new Set(progressRes.data.rated_snippet_ids || [])
         setRatedSnippets(ratedIds)
 
@@ -54,7 +54,7 @@ function RatingMode({ rater }) {
 
       const snippetId = snippets[currentIndex].id
       try {
-        const res = await axios.get(`/api/snippets/${snippetId}`)
+        const res = await api.get(`/api/snippets/${snippetId}`)
         setCurrentSnippet(res.data)
         // Reset rating selection if this snippet was already rated
         if (ratedSnippets.has(snippetId)) {
@@ -79,7 +79,7 @@ function RatingMode({ rater }) {
 
     setSubmitting(true)
     try {
-      await axios.post('/api/ratings', {
+      await api.post('/api/ratings', {
         snippet_id: currentSnippet.id,
         rater: rater,
         rating: selectedRating
