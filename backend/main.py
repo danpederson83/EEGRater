@@ -2,25 +2,24 @@
 FastAPI backend for EEG Rater application.
 """
 import os
-import json
 import random
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from backend.edf_parser import EDFParser
+from backend.database import init_db, get_db, Rating, Comparison
 
 # Configuration
 BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / "data"
 EDF_DIR = DATA_DIR / "edf_files"
 CACHE_DIR = DATA_DIR / "cache"
-RATINGS_FILE = DATA_DIR / "ratings.json"
-COMPARISONS_FILE = DATA_DIR / "comparisons.json"
 
 # Ensure directories exist
 DATA_DIR.mkdir(exist_ok=True)
@@ -35,20 +34,17 @@ app = FastAPI(title="EEG Rater API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # For the demo, "*" allows any site. You can restrict this later.
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# CORS middleware for React frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+# Initialize database on startup
+@app.on_event("startup")
+def startup_event():
+    init_db()
 
 
 # Pydantic models
@@ -70,21 +66,6 @@ class SnippetSummary(BaseModel):
     source_file: str
     start_time: float
     duration: float
-
-
-# Helper functions
-def load_json_file(filepath: Path) -> list:
-    """Load JSON array from file, return empty list if doesn't exist."""
-    if filepath.exists():
-        with open(filepath, 'r') as f:
-            return json.load(f)
-    return []
-
-
-def save_json_file(filepath: Path, data: list):
-    """Save data as JSON array to file."""
-    with open(filepath, 'w') as f:
-        json.dump(data, f, indent=2)
 
 
 # API Endpoints
@@ -140,7 +121,7 @@ def get_random_pair():
 
 
 @app.post("/api/ratings")
-def submit_rating(submission: RatingSubmission):
+def submit_rating(submission: RatingSubmission, db: Session = Depends(get_db)):
     """Submit a rating for a snippet."""
     # Validate rating range
     if not 1 <= submission.rating <= 10:
@@ -150,26 +131,29 @@ def submit_rating(submission: RatingSubmission):
     if edf_parser.get_snippet_by_id(submission.snippet_id) is None:
         raise HTTPException(status_code=404, detail="Snippet not found")
 
-    # Load existing ratings
-    ratings = load_json_file(RATINGS_FILE)
+    # Create rating record
+    rating = Rating(
+        snippet_id=submission.snippet_id,
+        rater=submission.rater,
+        rating=submission.rating
+    )
+    db.add(rating)
+    db.commit()
+    db.refresh(rating)
 
-    # Add new rating
-    rating_entry = {
-        "snippet_id": submission.snippet_id,
-        "rater": submission.rater,
-        "rating": submission.rating,
-        "timestamp": datetime.now().isoformat()
+    return {
+        "status": "success",
+        "rating": {
+            "snippet_id": rating.snippet_id,
+            "rater": rating.rater,
+            "rating": rating.rating,
+            "timestamp": rating.timestamp.isoformat()
+        }
     }
-    ratings.append(rating_entry)
-
-    # Save
-    save_json_file(RATINGS_FILE, ratings)
-
-    return {"status": "success", "rating": rating_entry}
 
 
 @app.post("/api/comparisons")
-def submit_comparison(submission: ComparisonSubmission):
+def submit_comparison(submission: ComparisonSubmission, db: Session = Depends(get_db)):
     """Submit a comparison result."""
     # Validate winner
     valid_winners = [submission.snippet_a, submission.snippet_b, "tie"]
@@ -182,59 +166,100 @@ def submit_comparison(submission: ComparisonSubmission):
     if edf_parser.get_snippet_by_id(submission.snippet_b) is None:
         raise HTTPException(status_code=404, detail="Snippet B not found")
 
-    # Load existing comparisons
-    comparisons = load_json_file(COMPARISONS_FILE)
+    # Create comparison record
+    comparison = Comparison(
+        snippet_a=submission.snippet_a,
+        snippet_b=submission.snippet_b,
+        winner=submission.winner,
+        rater=submission.rater
+    )
+    db.add(comparison)
+    db.commit()
+    db.refresh(comparison)
 
-    # Add new comparison
-    comparison_entry = {
-        "snippet_a": submission.snippet_a,
-        "snippet_b": submission.snippet_b,
-        "winner": submission.winner,
-        "rater": submission.rater,
-        "timestamp": datetime.now().isoformat()
+    return {
+        "status": "success",
+        "comparison": {
+            "snippet_a": comparison.snippet_a,
+            "snippet_b": comparison.snippet_b,
+            "winner": comparison.winner,
+            "rater": comparison.rater,
+            "timestamp": comparison.timestamp.isoformat()
+        }
     }
-    comparisons.append(comparison_entry)
-
-    # Save
-    save_json_file(COMPARISONS_FILE, comparisons)
-
-    return {"status": "success", "comparison": comparison_entry}
 
 
 @app.get("/api/progress/{rater}")
-def get_progress(rater: str):
+def get_progress(rater: str, db: Session = Depends(get_db)):
     """Get rating progress for a specific rater."""
     all_snippets = edf_parser.get_snippet_ids()
     total_snippets = len(all_snippets)
 
-    # Load ratings for this rater
-    ratings = load_json_file(RATINGS_FILE)
-    rater_ratings = [r for r in ratings if r["rater"] == rater]
-    rated_snippet_ids = set(r["snippet_id"] for r in rater_ratings)
+    # Get ratings for this rater
+    ratings = db.query(Rating).filter(Rating.rater == rater).all()
+    rated_snippet_ids = set(r.snippet_id for r in ratings)
 
-    # Load comparisons for this rater
-    comparisons = load_json_file(COMPARISONS_FILE)
-    rater_comparisons = [c for c in comparisons if c["rater"] == rater]
+    # Get comparisons for this rater
+    comparison_count = db.query(Comparison).filter(Comparison.rater == rater).count()
 
     return {
         "rater": rater,
         "total_snippets": total_snippets,
         "rated_count": len(rated_snippet_ids),
-        "comparison_count": len(rater_comparisons),
+        "comparison_count": comparison_count,
         "rated_snippet_ids": list(rated_snippet_ids)
     }
 
 
 @app.get("/api/unrated-snippets/{rater}")
-def get_unrated_snippets(rater: str):
+def get_unrated_snippets(rater: str, db: Session = Depends(get_db)):
     """Get list of snippet IDs not yet rated by this rater."""
     all_snippet_ids = set(edf_parser.get_snippet_ids())
 
-    ratings = load_json_file(RATINGS_FILE)
-    rated_ids = set(r["snippet_id"] for r in ratings if r["rater"] == rater)
+    ratings = db.query(Rating).filter(Rating.rater == rater).all()
+    rated_ids = set(r.snippet_id for r in ratings)
 
     unrated_ids = list(all_snippet_ids - rated_ids)
     return {"unrated_snippet_ids": unrated_ids, "count": len(unrated_ids)}
+
+
+@app.get("/api/ratings")
+def get_all_ratings(db: Session = Depends(get_db)):
+    """Get all ratings (for analysis)."""
+    ratings = db.query(Rating).all()
+    return {
+        "ratings": [
+            {
+                "id": r.id,
+                "snippet_id": r.snippet_id,
+                "rater": r.rater,
+                "rating": r.rating,
+                "timestamp": r.timestamp.isoformat()
+            }
+            for r in ratings
+        ],
+        "total": len(ratings)
+    }
+
+
+@app.get("/api/comparisons")
+def get_all_comparisons(db: Session = Depends(get_db)):
+    """Get all comparisons (for analysis)."""
+    comparisons = db.query(Comparison).all()
+    return {
+        "comparisons": [
+            {
+                "id": c.id,
+                "snippet_a": c.snippet_a,
+                "snippet_b": c.snippet_b,
+                "winner": c.winner,
+                "rater": c.rater,
+                "timestamp": c.timestamp.isoformat()
+            }
+            for c in comparisons
+        ],
+        "total": len(comparisons)
+    }
 
 
 if __name__ == "__main__":
