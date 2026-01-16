@@ -27,7 +27,7 @@ venv/
 Thumbs.db
 
 # Data files (EDF files are large and user-specific)
-data/edf_files/
+#data/edf_files/
 data/cache/
 data/ratings.json
 data/comparisons.json
