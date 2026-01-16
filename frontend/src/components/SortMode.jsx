@@ -102,6 +102,7 @@ function SortMode({ rater }) {
   const [estimatedTotal, setEstimatedTotal] = useState(0)
   const [sortComplete, setSortComplete] = useState(false)
   const [finalRanking, setFinalRanking] = useState([])
+  const [previewSnippet, setPreviewSnippet] = useState(null)
 
   // Load all snippets on mount
   useEffect(() => {
@@ -257,16 +258,36 @@ function SortMode({ rater }) {
           <h2>Sorting Complete!</h2>
           <p>You made {comparisonsCount} comparisons to rank {finalRanking.length} snippets.</p>
 
-          <div className="ranking-list">
-            <h3>Final Ranking (Most Abnormal to Least Abnormal)</h3>
-            <ol>
-              {finalRanking.map((snippet, index) => (
-                <li key={snippet.id} className="ranking-item">
-                  <span className="rank-number">#{index + 1}</span>
-                  <span className="snippet-id">Snippet {index + 1}</span>
-                </li>
-              ))}
-            </ol>
+          <div className="ranking-content">
+            <div className="ranking-list">
+              <h3>Final Ranking (Most Abnormal to Least Abnormal)</h3>
+              <p className="ranking-hint">Click a snippet to preview it</p>
+              <ol>
+                {finalRanking.map((snippet, index) => (
+                  <li
+                    key={snippet.id}
+                    className={`ranking-item clickable ${previewSnippet?.id === snippet.id ? 'selected' : ''}`}
+                    onClick={() => setPreviewSnippet(previewSnippet?.id === snippet.id ? null : snippet)}
+                  >
+                    <span className="rank-number">#{index + 1}</span>
+                    <span className="snippet-id">Snippet {index + 1}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            <div className="ranking-preview">
+              {previewSnippet ? (
+                <EEGViewer
+                  snippet={previewSnippet}
+                  title={`Rank #${finalRanking.findIndex(s => s.id === previewSnippet.id) + 1}`}
+                />
+              ) : (
+                <div className="preview-placeholder">
+                  Select a snippet to preview
+                </div>
+              )}
+            </div>
           </div>
 
           <button className="sort-btn new-pair" onClick={() => handleStartOver(true)}>

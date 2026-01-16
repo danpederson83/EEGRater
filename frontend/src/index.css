@@ -554,21 +554,58 @@ body {
   border-radius: 8px;
   margin-bottom: 8px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 2px solid transparent;
 }
 
-.ranking-item:first-child {
-  background: #fff3cd;
-  border: 2px solid #ffc107;
+.ranking-item.clickable {
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.ranking-item:nth-child(2) {
+.ranking-item.clickable:hover {
+  background: #f0f0f0;
+  border-color: #3498db;
+}
+
+.ranking-item.selected {
+  background: #ebf5fb;
+  border-color: #3498db;
+}
+
+.ranking-hint {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 15px;
+}
+
+.ranking-content {
+  display: flex;
+  gap: 30px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.ranking-content .ranking-list {
+  flex: 0 0 300px;
+  margin: 0;
+}
+
+.ranking-preview {
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
   background: #f8f9fa;
-  border: 2px solid #adb5bd;
-}
-
-.ranking-item:nth-child(3) {
-  background: #fdf2e9;
-  border: 2px solid #e67e22;
+  border: 2px dashed #ddd;
+  border-radius: 8px;
+  color: #888;
+  font-size: 1rem;
 }
 
 .rank-number {
